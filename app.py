@@ -2172,94 +2172,9 @@ with tab1:
 with tab2:
 
     st.subheader(
-        "作成中のため、感性をお待ちください。"
+        "作成中のため、完成をお待ちください。"
     )
 
-
-    if not df_matomaru.empty:
-
-        pivot_df = df_matomaru.pivot_table(
-            index="台番号",
-            columns="日付",
-            values="差枚",
-            aggfunc="first",
-        )
-
-
-        def style_diff(val):
-
-            if pd.isna(val):
-
-                return ""
-
-
-            elif val > 0:
-
-                return (
-                    "background-color:#ffcdd2;"
-                    "color:#b71c1c;"
-                    "font-weight:bold;"
-                )
-
-
-            elif val < 0:
-
-                return (
-                    "background-color:#bbdefb;"
-                    "color:#0d47a1;"
-                    "font-weight:bold;"
-                )
-
-
-            return ""
-
-
-        styled_pivot = (
-            pivot_df.style
-            .map(style_diff)
-            .format(
-                "{:+.0f}",
-                na_rep="-"
-            )
-        )
-
-
-        st.dataframe(
-            styled_pivot,
-            use_container_width=True,
-        )
-
-
-        # --------------------------------------
-        # DB全データ
-        # --------------------------------------
-
-        with st.expander(
-            "📝 まとまる君 DB全データ一覧"
-        ):
-
-            st.dataframe(
-                df_matomaru[
-                    [
-                        "日付",
-                        "台番号",
-                        "機種名",
-                        "差枚",
-                        "回転G数",
-                        "並び人数",
-                        "取材",
-                        "来店",
-                    ]
-                ],
-                use_container_width=True,
-            )
-
-
-    else:
-
-        st.info(
-            "まとまる君テーブルにデータがありません。"
-        )
 
 # ==========================================
 # ダッシュボード最下部：戻る
