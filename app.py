@@ -625,6 +625,96 @@ html, body, [class*="css"] {
     color: #f5f7ff;
 }
 
+
+/* =========================================================
+   Streamlit Community Cloud の外側UIを非表示
+   ・GitHub / Fork
+   ・右上の三点メニュー
+   ・StreamlitのDeploy/管理UI
+   ・右下の赤いステータス/管理ボタン
+   ・上部ヘッダーの余白
+   ※アプリ本体のUIには影響させない
+   ========================================================= */
+
+/* 上部ヘッダー全体 */
+header,
+header[data-testid="stHeader"],
+div[data-testid="stHeader"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* GitHub / Fork / 三点メニュー等を含むStreamlit Toolbar */
+[data-testid="stToolbar"],
+div[data-testid="stToolbar"],
+[data-testid="stToolbarActions"],
+div[data-testid="stToolbarActions"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Streamlit の上部・下部にある管理用UI */
+.stDeployButton,
+div[data-testid="stAppDeployButton"],
+button[data-testid="stAppDeployButton"],
+[data-testid="stStatusWidget"],
+div[data-testid="stStatusWidget"],
+[data-testid="stDecoration"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* 旧バージョンのStreamlitで使われる管理UI */
+#MainMenu,
+footer {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* ヘッダーを消した分、アプリを最上部から開始 */
+[data-testid="stAppViewContainer"],
+.stAppViewContainer,
+.main {
+    padding-top: 0 !important;
+}
+
+section.main {
+    padding-top: 0 !important;
+}
+
+/* モバイルSafari等で残るヘッダー用スペースを除去 */
+[data-testid="stAppViewContainer"] > .main {
+    padding-top: 0 !important;
+}
+
+/* Streamlitがheader用に確保する上部余白を除去 */
+[data-testid="stAppViewBlockContainer"] {
+    padding-top: 1rem !important;
+}
+
+/* 念のため、ヘッダー内のGitHub/Fork等のボタンも対象 */
+header button,
+header a,
+header [role="button"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
 /* ブラウザ／パスワードマネージャーの鍵アイコンのみを非表示 */
 input::-webkit-credentials-auto-fill-button,
 input::-webkit-contacts-auto-fill-button,
@@ -1198,32 +1288,7 @@ if not st.session_state["authenticated"]:
         <style>
 
 
-        /* Streamlit上部ツールバーを非表示 */
-        [data-testid="stToolbar"] {
-            visibility: hidden !important;
-            height: 0 !important;
-        }
-
-        /* Streamlit上部ヘッダーの余白を削除 */
-        header[data-testid="stHeader"] {
-            visibility: hidden !important;
-            height: 0 !important;
-        }
-
-        /* Streamlit下部フッターを非表示 */
-        footer {
-            visibility: hidden !important;
-        }
-
-        /* 右下のStreamlitステータス・管理ボタンを非表示 */
-        [data-testid="stStatusWidget"] {
-            visibility: hidden !important;
-        }
-
-        /* StreamlitのDeployボタン等 */
-        .stDeployButton {
-            display: none !important;
-        }
+        /* Streamlitの外側UIは全画面共通CSSで非表示にしています。 */
         
         .block-container {
             width: min(650px, calc(100vw - 28px)) !important;
