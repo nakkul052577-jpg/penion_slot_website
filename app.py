@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-AUTH_PASSWORD = "pass"
+AUTH_PASSWORD = "complete777"
 DB_PATH = "p_ark_database.db"
 
 # 日本語カレンダーは外部パッケージを使わず、このファイル内で実装しています。
@@ -1541,8 +1541,8 @@ if not st.session_state["authenticated"]:
         st.markdown(
             """
             <div class="login-description">
-                パチスロ分析システムへようこそ。<br>
-                パスワードを入力してダッシュボードへ進んでください。
+                僕はペニオン君ぺに。<br>
+                パスワードを入力して僕の分析ページに進むぺに！
             </div>
             """,
             unsafe_allow_html=True,
@@ -1635,8 +1635,8 @@ df_slopachi, df_matomaru = load_data()
 # タブの作成
 tab1, tab2 = st.tabs(
     [
-        "3. スロパチ分析",
-        "4. まとまる君",
+        "1. スロパチ分析",
+        "2. まとまる君",
     ]
 )
 
@@ -1690,11 +1690,6 @@ with tab1:
         "開始日",
         "analysis_start_date",
         default_date=default_start_date,
-    )
-
-    st.markdown(
-        "<div class='date-range-wave'>〜</div>",
-        unsafe_allow_html=True,
     )
 
     end_date = japanese_calendar(
@@ -1765,11 +1760,17 @@ with tab1:
     if st.session_state["analysis_model_widget"] not in model_options:
         st.session_state["analysis_model_widget"] = widget_default
 
+    st.markdown(
+        "<div class='date-picker-label'>機種</div>",
+        unsafe_allow_html=True,
+    )
+
     st.selectbox(
         "機種",
         model_options,
         key="analysis_model_widget",
         on_change=_save_machine_filter,
+        label_visibility="collapsed",
     )
 
     # ランキング集計に使う機種は、selectboxの表示値ではなく
@@ -2171,7 +2172,7 @@ with tab1:
 with tab2:
 
     st.subheader(
-        "📈 連続投入分析 (日付 × 台番号)"
+        "作成中のため、感性をお待ちください。"
     )
 
 
