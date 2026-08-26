@@ -802,7 +802,7 @@ div[data-testid="stTextInput"] div[data-baseweb="input"] input {
 
 /* パスワードの「・」を少し大きくする */
 div[data-testid="stTextInput"] input[type="password"] {
-    font-size: 20px !important;
+    font-size: 15px !important;
     letter-spacing: 2px !important;
     color: #000000 !important;
     -webkit-text-fill-color: #000000 !important;
@@ -1196,6 +1196,35 @@ if not st.session_state["authenticated"]:
     st.markdown(
         """
         <style>
+
+
+        /* Streamlit上部ツールバーを非表示 */
+        [data-testid="stToolbar"] {
+            visibility: hidden !important;
+            height: 0 !important;
+        }
+
+        /* Streamlit上部ヘッダーの余白を削除 */
+        header[data-testid="stHeader"] {
+            visibility: hidden !important;
+            height: 0 !important;
+        }
+
+        /* Streamlit下部フッターを非表示 */
+        footer {
+            visibility: hidden !important;
+        }
+
+        /* 右下のStreamlitステータス・管理ボタンを非表示 */
+        [data-testid="stStatusWidget"] {
+            visibility: hidden !important;
+        }
+
+        /* StreamlitのDeployボタン等 */
+        .stDeployButton {
+            display: none !important;
+        }
+        
         .block-container {
             width: min(650px, calc(100vw - 28px)) !important;
             max-width: 650px !important;
