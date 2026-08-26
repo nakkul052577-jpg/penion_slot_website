@@ -383,11 +383,6 @@ def render_island_map(ranking_df):
             f'font-family="Arial, sans-serif" fill="{label_color}">{rank}</text>'
         )
 
-    status_text = (
-        f"表示中：{len(rank_map)}台 / ランキング連動"
-        if rank_map else
-        "ランキング対象データなし"
-    )
 
     svg = (
         f'<svg class="island-svg" viewBox="0 0 {ISLAND_CANVAS_SIZE[0]} {ISLAND_CANVAS_SIZE[1]}" '
@@ -471,13 +466,12 @@ div[data-testid="stPopoverBody"] div.stButton > button {{
 <body data-ranking-signature="{signature}">
 <div class="map-card">
 <div class="toolbar">
-<div>島図 <span style="opacity:.65">／ {status_text}</span></div>
+
 <div style="display:flex;align-items:center;gap:5px;">
-<button onclick="zoom(-0.1)">−</button><span class="zoom-label" id="zoomLabel">100%</span><button onclick="zoom(0.1)">＋</button><button onclick="resetZoom()">リセット</button>
+<button onclick="zoom(-0.1)">−</button><span class="zoom-label" id="zoomLabel">100%</span><button onclick="zoom(0.1)">＋</button>
 </div>
 </div>
 <div class="map-scroll"><div class="map-stage" id="mapStage">{svg}</div></div>
-<div class="hint">台番号にマウスを合わせると、順位・回数・機種名を確認できます。スマホでは横にスワイプできます。</div>
 </div>
 <script>
 (function() {{
@@ -1629,19 +1623,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 更新・戻るはタイトルとは別の行にする。
-# スマホでも横幅を圧迫せず、右下に固定して表示する。
-header_action_left, header_action_right = st.columns([1, 1], gap="small")
-with header_action_left:
-    if st.button("更新", use_container_width=True, key="refresh_data_button"):
-        st.cache_data.clear()
-        st.success("画面を最新データに更新しました！")
-        st.rerun()
-with header_action_right:
-    if st.button("戻る", use_container_width=True, key="back_to_store_button"):
-        st.session_state["selected_store"] = None
-        st.rerun()
-
 st.markdown("---")
 
 
@@ -2278,3 +2259,15 @@ with tab2:
         st.info(
             "まとまる君テーブルにデータがありません。"
         )
+
+# ==========================================
+# ダッシュボード最下部：戻る
+# ==========================================
+
+st.markdown("---")
+
+back_col = st.columns([4, 1, 4])[1]
+with back_col:
+    if st.button("戻る", use_container_width=True, key="back_to_store_button"):
+        st.session_state["selected_store"] = None
+        st.rerun()
