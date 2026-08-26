@@ -1122,6 +1122,57 @@ div[data-testid="stPopover"] > div > button div {
    ダーク背景＋白文字
    ========================================== */
 
+/* =========================================================
+   スマホ表示時のカレンダー崩れ防止
+   Streamlitはスマホ幅で st.columns() を縦並びにするため、
+   カレンダーの「前月・年月・次月」や「曜日・日付」が
+   1列になっていました。ポップオーバー内だけ横並びに固定します。
+   ========================================================= */
+@media (max-width: 768px) {
+    div[data-testid="stPopoverBody"] {
+        width: min(94vw, 520px) !important;
+        max-width: 94vw !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    /* カレンダー内部の全 st.columns をスマホでも横並びにする */
+    div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        gap: 3px !important;
+    }
+
+    div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        min-width: 0 !important;
+        width: 0 !important;
+        flex: 1 1 0 !important;
+    }
+
+    /* 日付・曜日ボタンを各列の幅に収める */
+    div[data-testid="stPopoverBody"] div.stButton,
+    div[data-testid="stPopoverBody"] div.stButton > button {
+        width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    div[data-testid="stPopoverBody"] div.stButton > button {
+        padding-left: 2px !important;
+        padding-right: 2px !important;
+        font-size: 13px !important;
+    }
+
+    /* カレンダー内の余白をスマホ向けに少し縮小 */
+    div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"] {
+        min-width: 0 !important;
+    }
+}
+
 div[data-testid="stPopoverBody"] {
     background: #0f1422 !important;
     background-color: #0f1422 !important;
@@ -1506,7 +1557,7 @@ with col_title:
 
 with col_btn:
     st.write("")
-    if st.button("更新", use_container_width=True, key="refresh_data_button"):
+    if st.button("更新", use_container_width=False, key="refresh_data_button"):
         st.cache_data.clear()
         st.success("画面を最新データに更新しました！")
         st.rerun()
