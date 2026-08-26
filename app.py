@@ -3,6 +3,7 @@ import time
 import sqlite3
 import base64
 import calendar
+import re
 from datetime import date, timedelta
 
 import pandas as pd
@@ -21,7 +22,30 @@ st.set_page_config(
 )
 
 AUTH_PASSWORD = "complete777"
-DB_PATH = "p_ark_database.db"
+
+# DBは「実行したターミナルのカレントフォルダ」ではなく、
+# このPythonファイルが置かれているフォルダを基準に読み込む。
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def resolve_db_path(filename):
+    """
+    DBの実体を確実に探す。
+    1. このPythonファイルと同じフォルダ
+    2. Streamlitを実行した現在のフォルダ
+    の順に確認する。
+    """
+    candidates = [
+        os.path.join(BASE_DIR, filename),
+        os.path.abspath(filename),
+    ]
+
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+
+    # 見つからない場合も、最も自然な配置場所を返す。
+    # load_data()側で存在チェックを行い、SQLiteが空DBを新規作成するのを防ぐ。
+    return candidates[0]
 
 # 日本語カレンダーは外部パッケージを使わず、このファイル内で実装しています。
 
@@ -30,77 +54,85 @@ DB_PATH = "p_ark_database.db"
 # 2. データベース初期化＆ロード処理
 # ==========================================
 
+STORE_CONFIG = {
+    "ピーアーク相模大野": {
+        "db_path": "database.db",
+        "slopachi_table": "ピーアーク相模大野_スロパチ",
+        "matomaru_table": "ピーアーク相模大野_まとまる君",
+        "map": "p_ark",
+    },
+    "メガフェイス1180座間店": {
+        "db_path": "database.db",
+        "slopachi_table": "メガフェイス1180座間店_スロパチ",
+        "matomaru_table": None,
+        "map": "megaface_zama",
+    },
+}
+
+
+def quote_identifier(name):
+    return '"' + str(name).replace('"', '""') + '"'
+
+
 def init_db():
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS ピーアーク相模大野_スロパチ (
-        項番 INTEGER PRIMARY KEY AUTOINCREMENT,
-        日付 TEXT,
-        台番号 TEXT,
-        機種名 TEXT,
-        UNIQUE(日付, 台番号, 機種名)
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS ピーアーク相模大野_まとまる君 (
-        項番 INTEGER PRIMARY KEY AUTOINCREMENT,
-        日付 TEXT,
-        並び人数 TEXT,
-        取材 TEXT,
-        来店 TEXT,
-        機種名 TEXT,
-        台番号 TEXT,
-        差枚 INTEGER,
-        回転G数 INTEGER,
-        UNIQUE(日付, 台番号)
-    )
-    """)
-
-    conn.commit()
-
-    # ------------------------------------------
-    # サンプルデータは登録しない
-    # ------------------------------------------
-    # このアプリは p_ark_datebase.db に保存されている
-    # 実データのみを読み込みます。
-
-    conn.close()
+    """
+    既存DBは一切変更しない。
+    以前の実装ではDBが見つからない場合でもSQLiteが空のDBを作成し、
+    「データがありません」という分かりにくい状態になっていたため、
+    ここではDBやテーブルを自動作成しない。
+    """
+    return
 
 
+def load_data(store_name):
+    """選択した店舗の既存DB・既存テーブルだけを安全に読み込む。"""
+    config = STORE_CONFIG[store_name]
+    db_path = resolve_db_path(config["db_path"])
 
-init_db()
+    # sqlite3.connect() は存在しないパスでも空DBを作ってしまうため、
+    # 必ず先に存在確認を行う。
+    if not os.path.isfile(db_path):
+        raise FileNotFoundError(
+            f"DBファイルが見つかりません: {db_path}"
+        )
 
+    conn = sqlite3.connect(db_path)
 
-def load_data():
+    try:
+        existing_tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
 
-    conn = sqlite3.connect(DB_PATH)
+        slopachi_name = config["slopachi_table"]
+        if slopachi_name not in existing_tables:
+            raise RuntimeError(
+                f"テーブルが見つかりません: {slopachi_name} / "
+                f"DB: {db_path} / 存在するテーブル: {', '.join(sorted(existing_tables))}"
+            )
 
-    df_sp = pd.read_sql_query(
-        """
-        SELECT *
-        FROM ピーアーク相模大野_スロパチ
-        ORDER BY 日付 DESC
-        """,
-        conn,
-    )
+        table_sp = quote_identifier(slopachi_name)
+        df_sp = pd.read_sql_query(
+            f"SELECT * FROM {table_sp} ORDER BY 日付 DESC",
+            conn,
+        )
 
-    df_mt = pd.read_sql_query(
-        """
-        SELECT *
-        FROM ピーアーク相模大野_まとまる君
-        ORDER BY 日付 DESC
-        """,
-        conn,
-    )
+        matomaru_table = config.get("matomaru_table")
+        if matomaru_table and matomaru_table in existing_tables:
+            table_mt = quote_identifier(matomaru_table)
+            df_mt = pd.read_sql_query(
+                f"SELECT * FROM {table_mt} ORDER BY 日付 DESC",
+                conn,
+            )
+        else:
+            df_mt = pd.DataFrame()
 
-    conn.close()
+    finally:
+        conn.close()
 
     return df_sp, df_mt
-
 
 # ==========================================
 # 島図表示（ランキング完全連動・HTML/SVG描画）
@@ -114,7 +146,7 @@ import hashlib
 import html as html_lib
 import json
 
-ISLAND_CANVAS_SIZE = (2030, 964)
+ISLAND_CANVAS_SIZE = (2050, 700)
 ISLAND_CELL_W = 37
 ISLAND_CELL_H = 19
 
@@ -154,7 +186,7 @@ def _add_island_row(position_map, numbers, y, xs=None, x0=180, step=42):
         position_map.setdefault(str(number), []).append((mapped_x, mapped_y))
 
 
-def build_island_positions():
+def build_p_ark_island_positions():
     m = {}
 
     _add_island_row(m, range(2245, 2264), 46)
@@ -270,8 +302,161 @@ def build_island_positions():
     return m
 
 
-ISLAND_POSITIONS = build_island_positions()
+P_ARK_ISLAND_POSITIONS = build_p_ark_island_positions()
 
+
+
+# ==========================================
+# メガフェイス1180座間店 島図
+# ユーザー提供の島図画像に合わせた台番号配置
+# ==========================================
+
+def _add_raw_row(position_map, numbers, y, x0, step=40):
+    for i, number in enumerate(numbers):
+        position_map.setdefault(str(number), []).append((x0 + i * step, y))
+
+
+def build_megaface_zama_positions():
+    """
+    メガフェイス1180座間店の島図。
+    ユーザー提供の基準画像（2048×698）に合わせて座標を作り直した版。
+    1つの台番号につき1つの座標だけを登録し、重なりを発生させない。
+    """
+    m = {}
+
+    # 同じ台番号が島図内の複数箇所に表示されるケースがあるため、
+    # 代入で上書きせず、座標を追加する。
+    def add(number, x, y):
+        key = str(number)
+        m.setdefault(key, []).append((x, y))
+
+    def row(numbers, y, x0, step=40):
+        for i, number in enumerate(numbers):
+            add(number, x0 + i * step, y)
+
+    def col(numbers, x, y0, step=20):
+        for i, number in enumerate(numbers):
+            add(number, x, y0 + i * step)
+
+    # ===== 左上ブロック =====
+    row(range(870, 884), 45, 315)
+    row(range(869, 856, -1), 65, 355)
+    row(range(843, 857), 105, 315)
+    row(range(842, 828, -1), 125, 315)
+    row(range(812, 829), 175, 205)
+    row(range(811, 796, -1), 195, 225)
+
+    # ===== 左中央・折れ島 =====
+    col([735, 734, 733, 732, 731, 730, 729, 728, 727], 115, 285)
+    col([739, 740, 741, 742], 155, 325)
+    row([743], 385, 195)
+    row([744], 425, 155)
+    row([726, 725, 724], 445, 150)
+    row([723], 425, 280)
+
+    # 左中央横島
+    row(range(769, 782), 325, 355)
+    row(range(768, 781, -1), 345, 315)
+    row(range(765, 755, -1), 385, 390)
+    row(range(744, 755), 425, 420)
+    row(range(720, 710, -1), 445, 420)
+    row([721], 405, 315)
+    row([722], 425, 315)
+
+    # ===== 左下 =====
+    row(range(692, 710), 520, 165)
+    row(range(691, 676, -1), 540, 315)
+    row(range(656, 677), 590, 60)
+    row(range(655, 634, -1), 610, 60)
+    row(range(614, 635), 665, 60)
+
+    # ===== 中央上 789番台 =====
+    row(range(789, 796), 245, 565)
+    row(range(788, 781, -1), 265, 565)
+
+    # ===== 中央上・1100番台の折れ島 =====
+    row([1105, 1106, 1107], 80, 1040)
+    row([1104], 100, 1000)
+    row([1108], 100, 1160)
+    row([1103, 1102], 120, 1040)
+    col([1101, 1100], 1115, 140)
+    col([1109, 1110, 1111, 1112], 1200, 140)
+    row([1098, 1099], 180, 1040)
+    row([1117], 200, 1000)
+    row([1116, 1115, 1114], 220, 1040)
+    row([1113], 200, 1160)
+
+    # ===== 中央 1050・1040番台 =====
+    # ここは以前 step=0 で重なっていたため、縦配置に修正
+    col([1045, 1046, 1047, 1048, 1049, 1050], 1220, 245)
+    col([1059, 1058, 1057], 970, 305)
+    row([1056], 385, 1000)
+    row([1055, 1054, 1053, 1052], 405, 1040)
+    row([1051], 385, 1200)
+
+    # ===== 中央横長 900番台 =====
+    row(range(925, 941), 445, 965)
+    row(range(364, 349, -1), 465, 1040)
+
+    # ===== 330番台 =====
+    row(range(331, 351), 520, 965)
+    row(range(330, 315, -1), 540, 1080)
+
+    # ===== 290番台 =====
+    row(range(295, 314), 590, 1040)
+    row(range(294, 272, -1), 610, 965)
+
+    # ===== 250番台 =====
+    row(range(253, 275), 665, 965)
+
+    # ===== 右上長島 =====
+    row(range(1151, 1134, -1), 180, 1340)
+    row(range(1118, 1135), 230, 1335)
+    row(range(1117, 1133, -1), 250, 1335)
+
+    # ===== 右中央 1000番台 =====
+    row(range(1067, 1081), 305, 1335)
+    row(range(1011, 996, -1), 325, 1335)
+
+    # ===== 右中央の折れ島 =====
+    # Excel画像の形に合わせて、上段・下段・縦列を個別配置。
+    row([956, 957, 958, 959, 960, 961], 375, 1340)
+    row([979, 978, 977, 976, 975, 974], 395, 1340)
+
+    # 左側の縦列
+    col([973, 972, 971, 970, 969], 1620, 375)
+
+    # 上側の折れ部分
+    row([995, 994, 993], 395, 1660)
+    row([992], 435, 1660)
+    row([991, 990], 455, 1700)
+    row([989], 435, 1780)
+    row([988, 987, 986], 395, 1780)
+
+    # 下側の折れ部分
+    row([968], 475, 1660)
+    row([967, 966], 495, 1700)
+    row([965], 475, 1780)
+    row([964], 455, 1860)
+
+    # Excelでは 961〜963 が右側に縦配置されているため、
+    # 上段の961を残したまま別座標を追加する。
+    col([961, 962, 963], 1860, 415)
+
+    # ===== 右端縦列 =====
+    col([960, 959, 958, 957], 1980, 180)
+    col([955, 953, 952, 951, 950, 949, 948], 1980, 285)
+    col([946, 945, 944, 943, 941], 1980, 445)
+
+    return m
+
+MEGAFACE_ZAMA_ISLAND_POSITIONS = build_megaface_zama_positions()
+
+
+def get_island_positions(store_name):
+    if STORE_CONFIG.get(store_name, {}).get("map") == "megaface_zama":
+        return MEGAFACE_ZAMA_ISLAND_POSITIONS
+    return P_ARK_ISLAND_POSITIONS
 
 def _normalise_ranking_for_map(ranking_df):
     rank_map = {}
@@ -314,15 +499,16 @@ def _svg_escape(value):
     return html_lib.escape(str(value), quote=True)
 
 
-def render_island_map(ranking_df):
+def render_island_map(ranking_df, store_name):
     """画像を使わずSVGで島図を描画し、ランキング変更に完全連動させる。"""
     rank_map = _normalise_ranking_for_map(ranking_df)
+    island_positions = get_island_positions(store_name)
     signature = _island_rank_signature(rank_map)
 
     cells = []
     seen = set()
 
-    for machine_number, positions in ISLAND_POSITIONS.items():
+    for machine_number, positions in island_positions.items():
         for x, y in positions:
             coord_key = (machine_number, x, y)
             if coord_key in seen:
@@ -390,8 +576,8 @@ def render_island_map(ranking_df):
         f'<rect x="0" y="0" width="{ISLAND_CANVAS_SIZE[0]}" height="{ISLAND_CANVAS_SIZE[1]}" fill="#fafafa"/>'
         f'{"".join(legend)}'
         f'{"".join(cells)}'
-        f'<text x="1020" y="28" text-anchor="middle" font-size="14" font-weight="800" '
-        f'font-family="Arial, Noto Sans JP, sans-serif" fill="#555555">島図 / 台番号ランキング</text>'
+        f'<text x="{ISLAND_CANVAS_SIZE[0] / 2}" y="28" text-anchor="middle" font-size="14" font-weight="800" '
+        f'font-family="Arial, Noto Sans JP, sans-serif" fill="#555555">{_svg_escape(store_name)} / 台番号ランキング</text>'
         f'</svg>'
     )
 
@@ -409,8 +595,8 @@ body {{ font-family:Arial,"Noto Sans JP",sans-serif; }}
 .toolbar button {{ border:1px solid rgba(255,255,255,.2); background:#1b2131; color:#fff; border-radius:7px; padding:5px 10px; cursor:pointer; font-weight:700; }}
 .toolbar button:hover {{ background:#2a3247; }}
 .map-scroll {{ width:100%; overflow:auto; -webkit-overflow-scrolling:touch; background:#fafafa; padding:8px; }}
-.map-stage {{ position:relative; width:2030px; height:964px; transform-origin:top left; }}
-.island-svg {{ display:block; width:2030px; height:964px; user-select:none; }}
+.map-stage {{ position:relative; width:2050px; height:700px; transform-origin:top left; }}
+.island-svg {{ display:block; width:2050px; height:700px; user-select:none; }}
 .island-machine {{ cursor:default; }}
 .island-machine rect {{ transition:filter .12s, stroke-width .12s; }}
 .island-machine:hover rect {{ filter:brightness(1.06) drop-shadow(0 1px 2px rgba(0,0,0,.25)); stroke-width:2; }}
@@ -476,14 +662,14 @@ div[data-testid="stPopoverBody"] div.stButton > button {{
 <script>
 (function() {{
 const stage=document.getElementById('mapStage'); const label=document.getElementById('zoomLabel'); let scale=1;
-window.zoom=function(delta) {{ scale=Math.max(.5,Math.min(1.6,scale+delta)); stage.style.transform=`scale(${{scale}})`; stage.style.marginBottom=`${{964*(scale-1)}}px`; label.textContent=Math.round(scale*100)+'%'; }};
+window.zoom=function(delta) {{ scale=Math.max(.5,Math.min(1.6,scale+delta)); stage.style.transform=`scale(${{scale}})`; stage.style.marginBottom=`${{700*(scale-1)}}px`; label.textContent=Math.round(scale*100)+'%'; }};
 window.resetZoom=function() {{ scale=1; stage.style.transform='scale(1)'; stage.style.marginBottom='0px'; label.textContent='100%'; }};
 }})();
 </script>
 </body>
 </html>'''
 
-    components.html(html, height=1060, scrolling=False)
+    components.html(html, height=790, scrolling=False)
 
 
 # ==========================================
@@ -1588,7 +1774,7 @@ if st.session_state["selected_store"] is None:
     st.title("🏪 店舗選択")
     st.caption("分析対象の店舗を選択してください。")
 
-    store_options = ["店舗を選択して下さい", "ピーアーク相模大野"]
+    store_options = ["店舗を選択して下さい", "ピーアーク相模大野", "メガフェイス1180座間店"]
 
     store_name = st.selectbox(
         "店舗",
@@ -1630,7 +1816,16 @@ st.markdown("---")
 # DBから最新データ取得＆タブ描画
 # ==========================================
 
-df_slopachi, df_matomaru = load_data()
+try:
+    df_slopachi, df_matomaru = load_data(store)
+except Exception as e:
+    st.error("データベースの読み込みに失敗しました。")
+    st.code(str(e))
+    st.info(
+        "相模大野の場合は、このPythonファイルと同じフォルダに "
+        "p_ark_database.db があるか確認してください。"
+    )
+    st.stop()
 
 # タブの作成
 tab1, tab2 = st.tabs(
@@ -1686,15 +1881,79 @@ with tab1:
         default_start_date = date.today()
         default_end_date = date.today()
 
+    # 店舗ごとに日付選択状態を分離する。
+    # 以前に別の期間を選択した状態が残っていても、現在のDBに存在する
+    # 最小日付〜最大日付の外側であれば自動的に補正する。
+    # これにより「DBにはデータがあるのに、古い日付選択だけが残って0件」
+    # になる問題を防ぐ。
+    # これにより、メガフェイスで選択した日付が
+    # ピーアーク相模大野にそのまま残る問題を防ぐ。
+    # 店舗名をそのままstate keyに使うと、日本語名を記号に置換した際に
+    # 別店舗同士で似たキーになる可能性があるため、UTF-8の16進数で完全分離する。
+    store_state_key = str(store).encode("utf-8").hex()
+
+    start_state_key = f"analysis_start_date_{store_state_key}"
+    end_state_key = f"analysis_end_date_{store_state_key}"
+
+    # 初回だけDBの最小日付・最大日付を設定する。
+    # 以前の実装は毎回ここで年月日のselectbox stateまで上書きしていたため、
+    # ユーザーが変更しても次の再実行時に初期日付へ戻っていました。
+    def _initialize_date_state(state_key, initial_date):
+        if state_key not in st.session_state:
+            st.session_state[state_key] = initial_date
+            st.session_state[f"{state_key}_year"] = initial_date.year
+            st.session_state[f"{state_key}_month"] = initial_date.month
+            st.session_state[f"{state_key}_day"] = initial_date.day
+
+    _initialize_date_state(start_state_key, default_start_date)
+    _initialize_date_state(end_state_key, default_end_date)
+
+    # 以前のバージョンで保存された親stateがDB範囲外の場合だけ補正する。
+    # ただしユーザーが操作中の年・月・日は絶対に毎回上書きしない。
+    def _repair_out_of_range_date_once(state_key, fallback_date, lower_date, upper_date):
+        value = st.session_state.get(state_key)
+        try:
+            if isinstance(value, pd.Timestamp):
+                value = value.date()
+            elif isinstance(value, str):
+                parsed = pd.to_datetime(value, errors="coerce")
+                value = parsed.date() if not pd.isna(parsed) else None
+        except Exception:
+            value = None
+
+        if not isinstance(value, date) or value < lower_date or value > upper_date:
+            st.session_state[state_key] = fallback_date
+            # 子stateがまだ存在しない場合だけ初期化する。
+            if f"{state_key}_year" not in st.session_state:
+                st.session_state[f"{state_key}_year"] = fallback_date.year
+            if f"{state_key}_month" not in st.session_state:
+                st.session_state[f"{state_key}_month"] = fallback_date.month
+            if f"{state_key}_day" not in st.session_state:
+                st.session_state[f"{state_key}_day"] = fallback_date.day
+
+    if len(valid_dates) > 0:
+        _repair_out_of_range_date_once(
+            start_state_key,
+            default_start_date,
+            default_start_date,
+            default_end_date,
+        )
+        _repair_out_of_range_date_once(
+            end_state_key,
+            default_end_date,
+            default_start_date,
+            default_end_date,
+        )
+
     start_date = japanese_calendar(
         "開始日",
-        "analysis_start_date",
+        start_state_key,
         default_date=default_start_date,
     )
 
     end_date = japanese_calendar(
         "終了日",
-        "analysis_end_date",
+        end_state_key,
         default_date=default_end_date,
     )
 
@@ -1735,30 +1994,33 @@ with tab1:
     # 「selected_machine_filter」に別保存します。
     # 日付変更によるrerunではこの値を変更しません。
     #
-    if "selected_machine_filter" not in st.session_state:
-        st.session_state["selected_machine_filter"] = "全て"
+    # 店舗ごとに機種選択状態も分離する。
+    machine_filter_key = f"selected_machine_filter_{store_state_key}"
+    machine_widget_key = f"analysis_model_widget_{store_state_key}"
+
+    if machine_filter_key not in st.session_state:
+        st.session_state[machine_filter_key] = "全て"
 
     def _save_machine_filter():
         # ユーザーが機種selectboxを操作した時だけ、この値を更新する。
-        st.session_state["selected_machine_filter"] = (
-            st.session_state.get("analysis_model_widget", "全て")
+        st.session_state[machine_filter_key] = (
+            st.session_state.get(machine_widget_key, "全て")
         )
 
     # 保存している機種が現在のDBの選択肢から消えている場合のみ
     # 「全て」に戻す。
-    if st.session_state["selected_machine_filter"] not in model_options:
-        st.session_state["selected_machine_filter"] = "全て"
+    if st.session_state[machine_filter_key] not in model_options:
+        st.session_state[machine_filter_key] = "全て"
 
     # selectbox自身のキーと、実際のフィルタ条件を分離する。
-    # これが日付変更時に「全て」へ戻ってしまう問題を防ぐ。
-    widget_default = st.session_state["selected_machine_filter"]
+    widget_default = st.session_state[machine_filter_key]
 
-    if "analysis_model_widget" not in st.session_state:
-        st.session_state["analysis_model_widget"] = widget_default
+    if machine_widget_key not in st.session_state:
+        st.session_state[machine_widget_key] = widget_default
 
     # widget側が選択肢から外れている場合だけ同期する。
-    if st.session_state["analysis_model_widget"] not in model_options:
-        st.session_state["analysis_model_widget"] = widget_default
+    if st.session_state[machine_widget_key] not in model_options:
+        st.session_state[machine_widget_key] = widget_default
 
     st.markdown(
         "<div class='date-picker-label'>機種</div>",
@@ -1768,14 +2030,14 @@ with tab1:
     st.selectbox(
         "機種",
         model_options,
-        key="analysis_model_widget",
+        key=machine_widget_key,
         on_change=_save_machine_filter,
         label_visibility="collapsed",
     )
 
     # ランキング集計に使う機種は、selectboxの表示値ではなく
     # 「最後にユーザーが明示的に選択した値」を使用する。
-    selected_model = st.session_state["selected_machine_filter"]
+    selected_model = st.session_state[machine_filter_key]
 
     # ==========================================
     # 日付チェック
@@ -2153,7 +2415,7 @@ with tab1:
             "ランキング順位に応じて、島図上の該当台番号を自動で着色しています。"
         )
 
-        render_island_map(ranking_df)
+        render_island_map(ranking_df, store)
 
     # ==========================================
     # データがない場合
@@ -2161,19 +2423,27 @@ with tab1:
 
     else:
 
-        st.info(
-            "選択した日付範囲・機種に該当するデータがDBにありません。"
-        )
+        if len(valid_dates) > 0:
+            st.info(
+                "選択した日付範囲・機種に該当するデータがDBにありません。\n\n"
+                f"DBで認識できている日付範囲："
+                f"{min(valid_dates).strftime('%Y/%m/%d')} 〜 "
+                f"{max(valid_dates).strftime('%Y/%m/%d')}"
+            )
+        else:
+            st.info(
+                "DBは読み込めていますが、「日付」列を正しい日付として認識できません。"
+            )
 
 # ==========================================
 # タブ2
 # ==========================================
 
 with tab2:
-
-    st.subheader(
-        "作成中のため、完成をお待ちください。"
-    )
+    if store == "メガフェイス1180座間店":
+        st.info("メガフェイス1180座間店は現在スロパチ分析データのみ対応しています。")
+    else:
+        st.subheader("作成中のため、完成をお待ちください。")
 
 
 # ==========================================
