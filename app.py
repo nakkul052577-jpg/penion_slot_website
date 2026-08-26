@@ -1142,120 +1142,116 @@ div[data-testid="stPopover"] > div > button div {
    ========================================== */
 
 /* =========================================================
-   カレンダーポップオーバーのスマホ対応
-
-   Streamlit の st.popover は、スマホ表示でも内部の
-   st.columns() がPC用の最小幅を持つ場合があります。
-   その結果、カレンダー全体が画面幅を超えて横に広がります。
-
-   ここでは @media の判定に依存せず、カレンダー内部だけを
-   常に固定幅＋7列の横並びにして、スマホでは画面内に収めます。
+   カレンダーポップオーバー
+   スマホでは「ポップオーバー本体」を画面幅に合わせる。
+   StreamlitのバージョンによってDOMが異なるため、複数の
+   セレクタを同時に指定する。
    ========================================================= */
-div[data-testid="stPopoverBody"] {
-    width: min(380px, calc(100vw - 32px)) !important;
-    max-width: min(380px, calc(100vw - 32px)) !important;
+@media (max-width: 768px) {
+  div[data-testid="stPopoverBody"],
+  div[data-baseweb="popover"],
+  div[role="dialog"] {
+    width: calc(100vw - 24px) !important;
+    max-width: 360px !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
     overflow-x: hidden !important;
-    padding: 12px !important;
-}
+  }
 
-/* Popover 内の Streamlit コンテナが内容幅に引っ張られないようにする */
-div[data-testid="stPopoverBody"] > div,
-div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"],
-div[data-testid="stPopoverBody"] [data-testid="stVerticalBlockBorderWrapper"] {
+  div[data-testid="stPopoverBody"] > div,
+  div[data-baseweb="popover"] > div,
+  div[role="dialog"] > div,
+  div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"],
+  div[data-baseweb="popover"] [data-testid="stVerticalBlock"],
+  div[role="dialog"] [data-testid="stVerticalBlock"] {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
-}
+  }
 
-/* カレンダー内部の全 st.columns を横7列に固定 */
-div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] {
+  /* 日付行の7列を必ず横一列にする */
+  div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"],
+  div[data-baseweb="popover"] [data-testid="stHorizontalBlock"],
+  div[role="dialog"] [data-testid="stHorizontalBlock"] {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    gap: 3px !important;
     box-sizing: border-box !important;
-}
+    gap: 3px !important;
+  }
 
-div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-    display: block !important;
+  div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] > [data-testid="column"],
+  div[data-baseweb="popover"] [data-testid="stHorizontalBlock"] > [data-testid="column"],
+  div[role="dialog"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
     width: 0 !important;
     min-width: 0 !important;
     max-width: none !important;
     flex: 1 1 0 !important;
     box-sizing: border-box !important;
-}
+  }
 
-/* 日付・曜日ボタンを各列の幅に収める */
-div[data-testid="stPopoverBody"] div.stButton,
-div[data-testid="stPopoverBody"] div.stButton > button {
+  /* ボタンが列幅を押し広げないようにする */
+  div[data-testid="stPopoverBody"] div.stButton,
+  div[data-testid="stPopoverBody"] div.stButton > button,
+  div[data-baseweb="popover"] div.stButton,
+  div[data-baseweb="popover"] div.stButton > button,
+  div[role="dialog"] div.stButton,
+  div[role="dialog"] div.stButton > button {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
-}
+  }
 
-div[data-testid="stPopoverBody"] div.stButton > button {
-    min-height: 38px !important;
-    padding-left: 2px !important;
-    padding-right: 2px !important;
-    font-size: 14px !important;
+  div[data-testid="stPopoverBody"] div.stButton > button,
+  div[data-baseweb="popover"] div.stButton > button,
+  div[role="dialog"] div.stButton > button {
+    min-height: 36px !important;
+    padding: 3px 1px !important;
+    font-size: 13px !important;
     white-space: nowrap !important;
+  }
 }
 
-/* カレンダー内の余白も内容幅に合わせる */
-div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"] {
+/* 曜日はStreamlit columnsではなくHTMLの7列グリッド */
+.jp-calendar-weekdays {
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  gap: 3px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.jp-calendar-weekday {
+  min-width: 0 !important;
+  width: auto !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.jp-calendar-empty {
+  height: 36px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+@media (max-width: 768px) {
+  div[data-testid="stPopoverBody"],
+  div[data-baseweb="popover"],
+  div[role="dialog"] {
+    width: calc(100vw - 24px) !important;
+    max-width: 360px !important;
     min-width: 0 !important;
-    max-width: 100% !important;
-}
-
-div[data-testid="stPopoverBody"] {
-        width: min(94vw, 520px) !important;
-        max-width: 94vw !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-        overflow-x: hidden !important;
-    }
-
-    /* カレンダー内部の全 st.columns をスマホでも横並びにする */
-    div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        gap: 3px !important;
-    }
-
-    div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-        min-width: 0 !important;
-        width: 0 !important;
-        flex: 1 1 0 !important;
-    }
-
-    /* 日付・曜日ボタンを各列の幅に収める */
-    div[data-testid="stPopoverBody"] div.stButton,
-    div[data-testid="stPopoverBody"] div.stButton > button {
-        width: 100% !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-    }
-
-    div[data-testid="stPopoverBody"] div.stButton > button {
-        padding-left: 2px !important;
-        padding-right: 2px !important;
-        font-size: 13px !important;
-    }
-
-    /* カレンダー内の余白をスマホ向けに少し縮小 */
-    div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"] {
-        min-width: 0 !important;
-    }
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
 }
 
 div[data-testid="stPopoverBody"] {
