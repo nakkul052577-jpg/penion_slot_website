@@ -846,9 +846,39 @@ section.main > div.block-container {
         line-height: 1.3 !important;
     }
 
-    /* ダッシュボード上部の操作ボタンをスマホで横にはみ出させない */
-    div[data-testid="stHorizontalBlock"] {
+    /* ダッシュボード上部の「タイトル・更新・戻る」はスマホでも横並び */
+    div[data-testid="stHorizontalBlock"]:has(.dashboard-main-title) {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: flex-start !important;
+        width: 100% !important;
         max-width: 100% !important;
+        gap: 8px !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(.dashboard-main-title) > [data-testid="column"] {
+        min-width: 0 !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(.dashboard-main-title) > [data-testid="column"]:nth-child(1) {
+        flex: 8 1 0 !important;
+        width: auto !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(.dashboard-main-title) > [data-testid="column"]:nth-child(2),
+    div[data-testid="stHorizontalBlock"]:has(.dashboard-main-title) > [data-testid="column"]:nth-child(3) {
+        flex: 1.5 1 0 !important;
+        width: auto !important;
+    }
+
+    /* 更新・戻るボタンは各列の中で横幅いっぱいにする */
+    div[data-testid="stHorizontalBlock"]:has(.dashboard-main-title) div.stButton > button {
+        width: 100% !important;
+        min-width: 0 !important;
+        white-space: nowrap !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
     }
 
     /* 店舗選択・ログインのボタンを画面幅に合わせる */
@@ -1123,13 +1153,79 @@ div[data-testid="stPopover"] > div > button div {
    ========================================== */
 
 /* =========================================================
-   スマホ表示時のカレンダー崩れ防止
-   Streamlitはスマホ幅で st.columns() を縦並びにするため、
-   カレンダーの「前月・年月・次月」や「曜日・日付」が
-   1列になっていました。ポップオーバー内だけ横並びに固定します。
+   カレンダーポップオーバーのスマホ対応
+
+   Streamlit の st.popover は、スマホ表示でも内部の
+   st.columns() がPC用の最小幅を持つ場合があります。
+   その結果、カレンダー全体が画面幅を超えて横に広がります。
+
+   ここでは @media の判定に依存せず、カレンダー内部だけを
+   常に固定幅＋7列の横並びにして、スマホでは画面内に収めます。
    ========================================================= */
-@media (max-width: 768px) {
-    div[data-testid="stPopoverBody"] {
+div[data-testid="stPopoverBody"] {
+    width: min(380px, calc(100vw - 32px)) !important;
+    max-width: min(380px, calc(100vw - 32px)) !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+    padding: 12px !important;
+}
+
+/* Popover 内の Streamlit コンテナが内容幅に引っ張られないようにする */
+div[data-testid="stPopoverBody"] > div,
+div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"],
+div[data-testid="stPopoverBody"] [data-testid="stVerticalBlockBorderWrapper"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* カレンダー内部の全 st.columns を横7列に固定 */
+div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: 3px !important;
+    box-sizing: border-box !important;
+}
+
+div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+    display: block !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* 日付・曜日ボタンを各列の幅に収める */
+div[data-testid="stPopoverBody"] div.stButton,
+div[data-testid="stPopoverBody"] div.stButton > button {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+div[data-testid="stPopoverBody"] div.stButton > button {
+    min-height: 38px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    font-size: 14px !important;
+    white-space: nowrap !important;
+}
+
+/* カレンダー内の余白も内容幅に合わせる */
+div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+div[data-testid="stPopoverBody"] {
         width: min(94vw, 520px) !important;
         max-width: 94vw !important;
         min-width: 0 !important;
