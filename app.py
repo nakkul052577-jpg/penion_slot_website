@@ -421,6 +421,51 @@ body {{ font-family:Arial,"Noto Sans JP",sans-serif; }}
 .island-machine:hover rect {{ filter:brightness(1.06) drop-shadow(0 1px 2px rgba(0,0,0,.25)); stroke-width:2; }}
 .zoom-label {{ min-width:45px; text-align:center; }}
 .hint {{ padding:8px 12px; background:#fafafa; color:#777; font-size:11px; text-align:center; border-top:1px solid #ddd; }}
+
+/* ===== スマホ対応：ダッシュボード上部 ===== */
+.dashboard-header {{ width:100%; min-width:0; box-sizing:border-box; }}
+.dashboard-kicker {{ font-family:Orbitron,sans-serif; font-size:11px; letter-spacing:2px; color:#8e98b0; margin-bottom:3px; }}
+.dashboard-main-title {{ width:100%; color:#f8f9ff; font-size:42px; line-height:1.18; font-weight:850; letter-spacing:-1.2px; white-space:normal; word-break:keep-all; overflow-wrap:normal; margin:0; }}
+@media (max-width:768px) {{
+  .dashboard-kicker {{ font-size:10px !important; }}
+  .dashboard-main-title {{ font-size:28px !important; line-height:1.3 !important; letter-spacing:-.6px !important; }}
+}}
+
+/* ===== スマホ対応：カレンダー ===== */
+div[data-testid="stPopoverBody"] {{
+  width: min(360px, calc(100vw - 24px)) !important;
+  max-width: min(360px, calc(100vw - 24px)) !important;
+  min-width: 0 !important;
+  box-sizing:border-box !important;
+  overflow-x:hidden !important;
+  padding:10px !important;
+}}
+div[data-testid="stPopoverBody"] > div,
+div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"],
+div[data-testid="stPopoverBody"] [data-testid="stVerticalBlockBorderWrapper"] {{
+  width:100% !important; max-width:100% !important; min-width:0 !important; box-sizing:border-box !important;
+}}
+/* 日付グリッド用の目印。曜日はHTML、日付は7列columnsだが列幅を強制する。 */
+div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] {{
+  width:100% !important; max-width:100% !important; min-width:0 !important; box-sizing:border-box !important;
+  gap:3px !important; flex-wrap:nowrap !important;
+}}
+div[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  min-width:0 !important; width:0 !important; max-width:none !important; flex:1 1 0 !important; box-sizing:border-box !important;
+}}
+div[data-testid="stPopoverBody"] div.stButton,
+div[data-testid="stPopoverBody"] div.stButton > button {{
+  width:100% !important; max-width:100% !important; min-width:0 !important; box-sizing:border-box !important;
+}}
+div[data-testid="stPopoverBody"] div.stButton > button {{
+  min-height:36px !important; padding:3px 1px !important; font-size:13px !important; white-space:nowrap !important;
+}}
+.jp-calendar-weekdays {{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:3px; width:100%; box-sizing:border-box; }}
+.jp-calendar-weekday {{ min-width:0; text-align:center; overflow:hidden; }}
+.jp-calendar-empty {{ height:36px; width:100%; }}
+@media (max-width:768px) {{
+  div[data-testid="stPopoverBody"] {{ width:calc(100vw - 24px) !important; max-width:calc(100vw - 24px) !important; }}
+}}
 </style>
 </head>
 <body data-ranking-signature="{signature}">
@@ -454,21 +499,13 @@ window.resetZoom=function() {{ scale=1; stage.style.transform='scale(1)'; stage.
 JAPANESE_WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"]
 
 def japanese_calendar(label, state_key, default_date=None):
-    """
-    日付表示そのものをクリックすると、日本語カレンダーが開く日付ピッカー。
-
-    ・日付表示とカレンダーアイコンを同じ1つの枠にまとめる
-    ・枠全体をクリック可能にする
-    ・カレンダーはダークテーマ
-    ・曜日、年月、日付を日本語表示
-    """
+    """スマホでも画面幅を超えない日本語カレンダー。"""
     if default_date is None:
         default_date = date.today()
 
     if state_key not in st.session_state:
         st.session_state[state_key] = default_date
 
-    # 保存値を必ず date 型へ統一
     selected_date = st.session_state[state_key]
     if isinstance(selected_date, pd.Timestamp):
         selected_date = selected_date.date()
@@ -480,30 +517,16 @@ def japanese_calendar(label, state_key, default_date=None):
     if view_key not in st.session_state:
         st.session_state[view_key] = selected_date.replace(day=1)
 
-    st.markdown(
-        f"<div class='date-picker-label'>{label}</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown(f"<div class='date-picker-label'>{label}</div>", unsafe_allow_html=True)
 
-    # 日付＋カレンダーアイコンを「1つの枠」にする。
-    # このボタン全体を押すとカレンダーが開く。
-    with st.popover(
-        f"{selected_date.strftime('%Y/%m/%d')}",
-        use_container_width=True,
-    ):
-        nav_prev, nav_title, nav_next = st.columns([1, 5, 1])
+    with st.popover(f"{selected_date.strftime('%Y/%m/%d')}", use_container_width=True):
+        # 前月・年月・次月は3列。CSSではカレンダーの7列ルールを適用しない。
+        nav_prev, nav_title, nav_next = st.columns([1, 5, 1], gap="small")
 
         with nav_prev:
-            if st.button(
-                "‹",
-                key=f"{state_key}_prev_month",
-                use_container_width=True,
-            ):
+            if st.button("‹", key=f"{state_key}_prev_month", use_container_width=True):
                 current = st.session_state[view_key]
-                previous_month = (
-                    current.replace(day=1) - timedelta(days=1)
-                ).replace(day=1)
-                st.session_state[view_key] = previous_month
+                st.session_state[view_key] = (current.replace(day=1) - timedelta(days=1)).replace(day=1)
                 st.rerun()
 
         with nav_title:
@@ -514,66 +537,34 @@ def japanese_calendar(label, state_key, default_date=None):
             )
 
         with nav_next:
-            if st.button(
-                "›",
-                key=f"{state_key}_next_month",
-                use_container_width=True,
-            ):
+            if st.button("›", key=f"{state_key}_next_month", use_container_width=True):
                 current = st.session_state[view_key]
                 if current.month == 12:
-                    next_month = current.replace(
-                        year=current.year + 1,
-                        month=1,
-                        day=1,
-                    )
+                    next_month = current.replace(year=current.year + 1, month=1, day=1)
                 else:
-                    next_month = current.replace(
-                        month=current.month + 1,
-                        day=1,
-                    )
+                    next_month = current.replace(month=current.month + 1, day=1)
                 st.session_state[view_key] = next_month
                 st.rerun()
 
-        # 曜日
-        weekday_cols = st.columns(7)
-        for i, weekday in enumerate(JAPANESE_WEEKDAYS):
-            with weekday_cols[i]:
-                st.markdown(
-                    f"<div class='jp-calendar-weekday'>{weekday}</div>",
-                    unsafe_allow_html=True,
-                )
-
-        # 日付
-        month_days = calendar.monthcalendar(
-            view_month.year,
-            view_month.month,
+        # 曜日・日付はHTML/CSSの7列グリッドにして、Streamlitのcolumnsによる
+        # スマホ時の最小幅・折り返しの影響を受けないようにする。
+        st.markdown(
+            '<div class="jp-calendar-grid jp-calendar-weekdays">'
+            + ''.join(f'<div class="jp-calendar-weekday">{w}</div>' for w in JAPANESE_WEEKDAYS)
+            + '</div>',
+            unsafe_allow_html=True,
         )
 
+        month_days = calendar.monthcalendar(view_month.year, view_month.month)
         for week_index, week in enumerate(month_days):
-            day_cols = st.columns(7)
-
+            cols = st.columns(7, gap="small")
             for weekday_index, day_number in enumerate(week):
-                with day_cols[weekday_index]:
+                with cols[weekday_index]:
                     if day_number == 0:
-                        st.markdown(
-                            "<div class='jp-calendar-empty'></div>",
-                            unsafe_allow_html=True,
-                        )
+                        st.markdown('<div class="jp-calendar-empty"></div>', unsafe_allow_html=True)
                         continue
-
-                    day_date = date(
-                        view_month.year,
-                        view_month.month,
-                        day_number,
-                    )
-
-                    is_selected = day_date == selected_date
-                    button_label = (
-                        f"● {day_number}"
-                        if is_selected
-                        else str(day_number)
-                    )
-
+                    day_date = date(view_month.year, view_month.month, day_number)
+                    button_label = f"● {day_number}" if day_date == selected_date else str(day_number)
                     if st.button(
                         button_label,
                         key=f"{state_key}_day_{day_date.isoformat()}",
@@ -584,9 +575,7 @@ def japanese_calendar(label, state_key, default_date=None):
                         st.rerun()
 
         st.markdown(
-            f"<div class='jp-calendar-selected'>選択日："
-            f"{selected_date.year}年{selected_date.month}月{selected_date.day}日"
-            f"</div>",
+            f'<div class="jp-calendar-selected">選択日：{selected_date.strftime("%Y年%m月%d日")}</div>',
             unsafe_allow_html=True,
         )
 
@@ -1635,32 +1624,26 @@ if st.session_state["selected_store"] is None:
 
 store = st.session_state["selected_store"]
 
-col_title, col_btn, col_reset = st.columns([8, 1.5, 1.5])
+st.markdown(
+    """
+    <div class="dashboard-header">
+        <div class="dashboard-kicker">PENION ANALYTICS / DASHBOARD</div>
+        <div class="dashboard-main-title">分析ダッシュボード</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-with col_title:
-    st.markdown(
-        """
-        <div style="font-family:Orbitron,sans-serif; font-size:11px; letter-spacing:2px; color:#8e98b0; margin-bottom:3px;">
-            PENION ANALYTICS / DASHBOARD
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<div class="dashboard-main-title">分析ダッシュボード</div>',
-        unsafe_allow_html=True,
-    )
-
-with col_btn:
-    st.write("")
-    if st.button("更新", use_container_width=False, key="refresh_data_button"):
+# 更新・戻るはタイトルとは別の行にする。
+# スマホでも横幅を圧迫せず、右下に固定して表示する。
+header_action_left, header_action_right = st.columns([1, 1], gap="small")
+with header_action_left:
+    if st.button("更新", use_container_width=True, key="refresh_data_button"):
         st.cache_data.clear()
         st.success("画面を最新データに更新しました！")
         st.rerun()
-
-with col_reset:
-    st.write("")
-    if st.button("戻る", key="back_to_store_button"):
+with header_action_right:
+    if st.button("戻る", use_container_width=True, key="back_to_store_button"):
         st.session_state["selected_store"] = None
         st.rerun()
 
