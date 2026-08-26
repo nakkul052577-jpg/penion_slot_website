@@ -1,3 +1,5 @@
 .venv/
 __pycache__/
 .DS_Store
+fetch_suropachi.log
+fetch_suropachi_error.log
