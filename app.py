@@ -4,6 +4,7 @@ import sqlite3
 import base64
 import calendar
 import re
+import random
 from datetime import date, timedelta
 
 import pandas as pd
@@ -49,6 +50,15 @@ def resolve_db_path(filename):
 
 # 日本語カレンダーは外部パッケージを使わず、このファイル内で実装しています。
 
+
+
+# ==========================================
+# ミニゲーム用画像
+# このPythonファイルと同じフォルダに配置
+# ==========================================
+LOTTERY_RED_IMAGE = os.path.join(BASE_DIR, "lottery_red.png")
+LOTTERY_GOLD_IMAGE = os.path.join(BASE_DIR, "lottery_gold.png")
+LOTTERY_RAINBOW_IMAGE = os.path.join(BASE_DIR, "lottery_rainbow.png")
 
 # ==========================================
 # 2. データベース初期化＆ロード処理
@@ -1757,47 +1767,984 @@ if not st.session_state["authenticated"]:
 
 
 # ==========================================
-# 6. 店舗選択画面
+# 6. メニュー画面 / 店舗分析 / ミニゲーム
 # ==========================================
 
-if st.session_state["selected_store"] is None:
+if "app_page" not in st.session_state:
+    st.session_state["app_page"] = "menu"
 
+if "selected_store" not in st.session_state:
+    st.session_state["selected_store"] = None
+
+
+def show_top_menu():
     st.markdown(
         """
-        <div style="padding: 20px 0 8px; font-family: Orbitron, sans-serif; color: #9fa8bf; font-size: 11px; letter-spacing: 2px;">
+        <div style="padding: 20px 0 8px; font-family: Orbitron, sans-serif;
+                    color: #9fa8bf; font-size: 11px; letter-spacing: 2px;">
+            PENION ANALYTICS / MENU
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.title("PENION MENU")
+    st.caption("利用するコンテンツを選択してください。")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        with st.container(border=True):
+            st.subheader("店舗分析")
+            st.caption("店舗ごとのスロパチデータを分析します。")
+
+            if st.button(
+                "店舗分析を開く",
+                use_container_width=True,
+                key="open_store_analysis",
+            ):
+                st.session_state["app_page"] = "store_select"
+                st.rerun()
+
+    with col2:
+        with st.container(border=True):
+            st.subheader("ミニゲーム")
+            st.caption("ちょっと遊べるPENIONミニゲーム。")
+
+            if st.button(
+                "ミニゲームを開く",
+                use_container_width=True,
+                key="open_minigame",
+            ):
+                st.session_state["app_page"] = "minigame"
+                st.rerun()
+
+
+def show_store_select():
+    st.markdown(
+        """
+        <div style="padding: 20px 0 8px; font-family: Orbitron, sans-serif;
+                    color: #9fa8bf; font-size: 11px; letter-spacing: 2px;">
             PENION ANALYTICS / STORE SELECT
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.title("🏪 店舗選択")
+    back_col, _ = st.columns([1, 5])
+    with back_col:
+        if st.button("メニュー", key="back_to_menu_from_store"):
+            st.session_state["app_page"] = "menu"
+            st.session_state["selected_store"] = None
+            st.rerun()
+
+    st.title("店舗選択")
     st.caption("分析対象の店舗を選択してください。")
 
-    store_options = ["店舗を選択して下さい", "ピーアーク相模大野", "メガフェイス1180座間店"]
+    store_options = [
+        "店舗を選択して下さい",
+        "ピーアーク相模大野",
+        "メガフェイス1180座間店",
+    ]
+
+    current_store = st.session_state.get("selected_store")
+    default_index = (
+        store_options.index(current_store)
+        if current_store in store_options
+        else 0
+    )
 
     store_name = st.selectbox(
         "店舗",
         store_options,
-        index=0,
+        index=default_index,
         label_visibility="collapsed",
+        key="store_select_menu",
     )
 
-    if st.button("分析を開始  →", use_container_width=False, key="start_analysis_button"):
+    if st.button(
+        "分析を開始",
+        use_container_width=False,
+        key="start_analysis_button",
+    ):
         if store_name == "店舗を選択して下さい":
             st.warning("店舗を選択して下さい。")
         else:
             st.session_state["selected_store"] = store_name
+            st.session_state["app_page"] = "analysis"
             st.rerun()
 
+
+def show_minigame():
+    st.markdown(
+        """
+        <div style="padding:20px 0 8px;font-family:Orbitron,sans-serif;color:#9fa8bf;font-size:11px;letter-spacing:2px;">
+            PENION ANALYTICS / MINI GAME
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if st.button("メニューに戻る", key="back_to_menu_from_minigame"):
+        st.session_state["app_page"] = "menu"
+        st.rerun()
+
+    st.title("ゲーム選択")
+    st.caption("プレイするゲームを選択してください。")
+
+    game_name = st.selectbox(
+        "ゲームを選択",
+        ["抽選", "IFのパチンコ"],
+        key="selected_minigame",
+    )
+
+    st.markdown("---")
+
+    if game_name == "抽選":
+        st.subheader("抽選")
+        st.caption("抽選人数を選択し、ランダムで1人を決定します。")
+
+        # 抽選人数欄をゲーム選択欄と同じダーク系にする
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stNumberInput"] {
+                width: 100% !important;
+            }
+            div[data-testid="stNumberInput"] > div {
+                width: 100% !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+                width: 100% !important;
+                min-height: 50px !important;
+                background: #171d2d !important;
+                background-color: #171d2d !important;
+                border: 1px solid #454b5a !important;
+                border-radius: 12px !important;
+                box-shadow: none !important;
+                outline: none !important;
+                box-sizing: border-box !important;
+            }
+            div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {
+                background: #171d2d !important;
+                background-color: #171d2d !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="stNumberInput"] input {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                background: transparent !important;
+                font-size: 18px !important;
+                font-weight: 700 !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="stNumberInput"] button {
+                display: none !important;
+                visibility: hidden !important;
+                width: 0 !important;
+                min-width: 0 !important;
+                max-width: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+            }
+            div[data-testid="stNumberInput"] div[data-baseweb="input"]:hover,
+            div[data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within {
+                background: #171d2d !important;
+                background-color: #171d2d !important;
+                border-color: #454b5a !important;
+                box-shadow: none !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        lottery_people = st.number_input(
+            "抽選人数",
+            min_value=1,
+            max_value=10000,
+            value=100,
+            step=1,
+            key="lottery_people",
+        )
+
+        # カットイン用CSS
+        st.markdown(
+            """
+            <style>
+            .lottery-cutin-image {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                object-position: center;
+                display: block;
+            }
+            .lottery-loading-area {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                background: radial-gradient(
+                    circle at center,
+                    rgba(40,45,65,0.95),
+                    rgba(5,7,15,1)
+                );
+                box-sizing: border-box;
+            }
+            .lottery-loading-title {
+                font-size: 52px;
+                font-weight: 900;
+                letter-spacing: 4px;
+                margin-bottom: 24px;
+            }
+            .lottery-spinner {
+                width: 68px;
+                height: 68px;
+                border-radius: 50%;
+                border: 6px solid rgba(255,255,255,0.18);
+                border-top-color: #ffffff;
+                animation: lottery-spin 0.8s linear infinite;
+                margin-bottom: 22px;
+                box-sizing: border-box;
+            }
+            .lottery-loading-text {
+                color: rgba(255,255,255,0.72);
+                font-size: 15px;
+                letter-spacing: 3px;
+            }
+            @keyframes lottery-spin {
+                to { transform: rotate(360deg); }
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if st.button(
+            "抽選する 🎰",
+            use_container_width=True,
+            key="run_lottery",
+        ):
+            result = random.randint(1, int(lottery_people))
+            max_people = int(lottery_people)
+
+            if result <= 1:
+                with open(LOTTERY_RAINBOW_IMAGE, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+
+                animation_html = f"""
+                <img
+                    class="lottery-cutin-image"
+                    src="data:image/png;base64,{b64}"
+                    alt=""
+                >
+                """
+
+            elif result <= 10:
+                with open(LOTTERY_GOLD_IMAGE, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+
+                animation_html = f"""
+                <img
+                    class="lottery-cutin-image"
+                    src="data:image/png;base64,{b64}"
+                    alt=""
+                >
+                """
+
+            elif result <= 100:
+                with open(LOTTERY_RED_IMAGE, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+
+                animation_html = f"""
+                <img
+                    class="lottery-cutin-image"
+                    src="data:image/png;base64,{b64}"
+                    alt=""
+                >
+                """
+
+            else:
+                animation_html = """
+                <div class="lottery-loading-area">
+                    <div class="lottery-loading-title">抽選中...</div>
+                    <div class="lottery-spinner"></div>
+                    <div class="lottery-loading-text">RESULT CHECKING</div>
+                </div>
+                """
+
+            # 重要：st.markdownではなくcomponents.htmlでiframe内に描画する。
+            # これにより画像のBase64データを確実にブラウザへ渡す。
+            components.html(
+                f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        * {{ box-sizing: border-box; }}
+                        html, body {{
+                            margin: 0;
+                            padding: 0;
+                            width: 100%;
+                            height: 100%;
+                            overflow: hidden;
+                            background: transparent;
+                        }}
+                        .lottery-overlay {{
+                            position: fixed;
+                            inset: 0;
+                            width: 100%;
+                            height: 100%;
+                            background: rgba(0,0,0,0.84);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 20px;
+                        }}
+                        .lottery-window {{
+                            width: min(650px, calc(100vw - 40px));
+                            height: 300px;
+                            position: relative;
+                            overflow: hidden;
+                            border-radius: 16px;
+                            border: 1px solid rgba(255,255,255,0.25);
+                            background: #070912;
+                            box-shadow: 0 0 50px rgba(0,0,0,0.90), 0 0 100px rgba(255,255,255,0.08);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }}
+                        .lottery-cutin-image {{
+                            display: block;
+                            width: auto !important;
+                            height: auto !important;
+                            max-width: 100% !important;
+                            max-height: 100% !important;
+                            object-fit: contain !important;
+                            object-position: center center !important;
+                            margin: 0 auto;
+                        }}
+                        .lottery-loading-area {{
+                            position: absolute;
+                            inset: 0;
+                            width: 100%;
+                            height: 100%;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            color: #ffffff;
+                            background: radial-gradient(circle at center, rgba(40,45,65,0.95), rgba(5,7,15,1));
+                        }}
+                        .lottery-loading-title {{
+                            font-size: 52px;
+                            font-weight: 900;
+                            letter-spacing: 4px;
+                            margin-bottom: 24px;
+                            color: #ffffff;
+                        }}
+                        .lottery-spinner {{
+                            width: 68px;
+                            height: 68px;
+                            flex: 0 0 68px;
+                            border-radius: 50%;
+                            border: 6px solid rgba(255,255,255,0.18);
+                            border-top-color: #ffffff;
+                            animation: lottery-spin 0.8s linear infinite;
+                            margin-bottom: 22px;
+                        }}
+                        .lottery-loading-text {{
+                            color: rgba(255,255,255,0.72);
+                            font-size: 15px;
+                            letter-spacing: 3px;
+                        }}
+                        @keyframes lottery-spin {{
+                            to {{ transform: rotate(360deg); }}
+                        }}
+                        @media (max-width: 700px) {{
+                            .lottery-window {{
+                                width: 92vw;
+                                height: min(300px, 55vw);
+                            }}
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="lottery-overlay">
+                        <div class="lottery-window">
+                            {animation_html}
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """,
+                height=420,
+                scrolling=False,
+            )
+
+            # 結果は保存するが、現在の実行では表示しない。
+            # 3秒間のカットインを確実に見せるため、次回rerunで結果を表示する。
+            st.session_state["lottery_result"] = result
+            st.session_state["lottery_max_people"] = max_people
+
+            # 3秒後にブラウザ側ではなくPython側で結果へ切り替える。
+            # components.htmlが表示されるまでsleepしてからrerunする。
+            time.sleep(3)
+            st.rerun()
+
+        # 抽選ボタンを押した直後のrerunでは結果を表示する。
+        if "lottery_result" in st.session_state:
+            result = st.session_state["lottery_result"]
+            max_people = st.session_state.get(
+                "lottery_max_people",
+                int(lottery_people),
+            )
+
+            st.html(
+                f"""
+                <div style="
+                    margin:24px 0 12px;
+                    padding:24px 16px;
+                    border-radius:16px;
+                    border:1px solid rgba(255,255,255,.18);
+                    background:rgba(255,255,255,.04);
+                    text-align:center;
+                    height:300px;
+                    display:flex;
+                    flex-direction:column;
+                    justify-content:center;
+                    align-items:center;
+                    box-sizing:border-box;
+                ">
+                    <div style="
+                        color:#9fa8bf;
+                        font-size:15px;
+                        letter-spacing:1px;
+                        margin-bottom:8px;
+                    ">抽選結果</div>
+                    <div style="
+                        color:#fff;
+                        font-size:64px;
+                        font-weight:900;
+                        line-height:1.1;
+                    ">{result}</div>
+                    <div style="
+                        color:#9fa8bf;
+                        font-size:14px;
+                        margin-top:10px;
+                    ">1 〜 {max_people} の中から抽選</div>
+                </div>
+                """
+            )
+
+    elif game_name == "IFのパチンコ":
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stNumberInput"] label,
+            div[data-testid="stNumberInput"] p {
+                color: #d8dee9 !important;
+                font-weight: 600 !important;
+            }
+
+            /* 数値入力欄：ゲーム選択と同じ暗い背景・グレー系の枠 */
+            div[data-testid="stNumberInput"] {
+                background: transparent !important;
+            }
+
+            div[data-testid="stNumberInput"] [data-baseweb="input"],
+            div[data-testid="stNumberInput"] [data-baseweb="base-input"],
+            div[data-testid="stNumberInput"] [data-baseweb="input"] > div {
+                background-color: #1d2635 !important;
+                border-color: #465267 !important;
+                box-shadow: none !important;
+            }
+
+            div[data-testid="stNumberInput"] [data-baseweb="input"] {
+                border: 1px solid #465267 !important;
+                border-radius: 14px !important;
+                overflow: hidden !important;
+            }
+
+            div[data-testid="stNumberInput"] [data-baseweb="input"]:focus-within {
+                background-color: #1d2635 !important;
+                border-color: #64748b !important;
+                box-shadow: none !important;
+            }
+
+            div[data-testid="stNumberInput"] input,
+            div[data-testid="stNumberInput"] input[type="number"] {
+                color: #e5e7eb !important;
+                background-color: #1d2635 !important;
+                -webkit-text-fill-color: #e5e7eb !important;
+                border: none !important;
+                box-shadow: none !important;
+                opacity: 1 !important;
+            }
+
+            div[data-testid="stNumberInput"] input::placeholder {
+                color: #9ca3af !important;
+                -webkit-text-fill-color: #9ca3af !important;
+            }
+
+            /* number_input標準の－／＋ボタンは非表示 */
+            div[data-testid="stNumberInput"] button {
+                display: none !important;
+            }
+
+            div[data-testid="stCaptionContainer"] {
+                color: #aab4c5 !important;
+            }
+
+            /* IFのパチンコ内の条件入力枠 */
+            div[data-testid="stVerticalBlockBorderWrapper"] {
+                border: 1px solid #3f4a5c !important;
+                background: #171d29 !important;
+                box-shadow: none !important;
+            }
+
+            div[data-testid="stVerticalBlockBorderWrapper"] > div {
+                border-color: transparent !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.subheader("IFのパチンコ")
+        st.caption("入力した条件をもとに、通常時・初当たり・RUSHを完全確率でシミュレーションします。")
+
+        # ==========================================
+        # IFのパチンコ：振り分け行数の管理
+        # ==========================================
+        if "pachinko_distribution_count" not in st.session_state:
+            st.session_state["pachinko_distribution_count"] = 2
+
+        if "pachinko_result" not in st.session_state:
+            st.session_state["pachinko_result"] = None
+
+        def _pachinko_number(value, digits=0):
+            """表示用の数値整形"""
+            if digits == 0:
+                return f"{int(round(value)):,}"
+            return f"{value:,.{digits}f}"
+
+
+        st.markdown(
+            """
+            <div style="
+                background: linear-gradient(135deg, rgba(31,41,55,.98), rgba(17,24,39,.98));
+                border: 1px solid #3f4a5c;
+                border-radius: 14px;
+                padding: 18px 20px 8px;
+                margin-bottom: 12px;
+                color: #e5e7eb;
+            ">
+                <div style="
+                    font-size: 24px;
+                    font-weight: 800;
+                    color: #f3f4f6;
+                    letter-spacing: .5px;
+                ">条件</div>
+                <div style="
+                    margin-top: 5px;
+                    color: #aab4c5;
+                    font-size: 13px;
+                ">シミュレーションに使用する条件を入力してください</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.container(border=True):
+
+            jackpot_probability = st.number_input(
+                "1. 大当たり確率（1 / ○○○）",
+                min_value=1.0,
+                value=float(st.session_state.get("pachinko_jackpot_probability", 319.0)),
+                step=1.0,
+                key="pachinko_jackpot_probability",
+            )
+
+            rush_entry_rate = st.number_input(
+                "2. ラッシュ突入確率（%）",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.get("pachinko_rush_entry_rate", 60.0)),
+                step=1.0,
+                key="pachinko_rush_entry_rate",
+            )
+
+            initial_payout = st.number_input(
+                "3. 初当たり時の出球（玉）",
+                min_value=0,
+                value=int(st.session_state.get("pachinko_initial_payout", 1500)),
+                step=100,
+                key="pachinko_initial_payout",
+            )
+
+            rush_continue_rate = st.number_input(
+                "4. ラッシュ継続率（%）",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.get("pachinko_rush_continue_rate", 81.0)),
+                step=1.0,
+                key="pachinko_rush_continue_rate",
+            )
+
+            st.markdown("**ラッシュの出玉振り分け**")
+            st.caption("左に確率（%）、右に出球（玉）を入力してください。")
+
+            distribution = []
+            for i in range(st.session_state["pachinko_distribution_count"]):
+                left, right = st.columns(2)
+
+                default_rate = 50.0 if i < 2 else 0.0
+                default_payout = 1500 if i == 0 else (3000 if i == 1 else 1500)
+
+                with left:
+                    rate = st.number_input(
+                        f"確率 {i + 1}（%）",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=float(st.session_state.get(f"pachinko_distribution_rate_{i}", default_rate)),
+                        step=1.0,
+                        key=f"pachinko_distribution_rate_{i}",
+                    )
+                with right:
+                    payout = st.number_input(
+                        f"出球 {i + 1}（玉）",
+                        min_value=0,
+                        value=int(st.session_state.get(f"pachinko_distribution_payout_{i}", default_payout)),
+                        step=100,
+                        key=f"pachinko_distribution_payout_{i}",
+                    )
+
+                distribution.append({
+                    "rate": float(rate),
+                    "payout": int(payout),
+                })
+
+            # 振り分け入力欄の下に追加・削除ボタンを配置
+            add_col, remove_col, _ = st.columns([1, 1, 4])
+
+            with add_col:
+                add_distribution_clicked = st.button(
+                    "追加",
+                    key="pachinko_add_distribution",
+                    use_container_width=True,
+                )
+
+            with remove_col:
+                remove_distribution_clicked = (
+                    st.session_state["pachinko_distribution_count"] > 1
+                    and st.button(
+                        "削除",
+                        key="pachinko_remove_distribution",
+                        use_container_width=True,
+                    )
+                )
+
+            if add_distribution_clicked:
+                st.session_state["pachinko_distribution_count"] += 1
+                st.rerun()
+
+            if remove_distribution_clicked:
+                last_index = st.session_state["pachinko_distribution_count"] - 1
+                st.session_state["pachinko_distribution_count"] -= 1
+                st.session_state.pop(f"pachinko_distribution_rate_{last_index}", None)
+                st.session_state.pop(f"pachinko_distribution_payout_{last_index}", None)
+                st.rerun()
+
+            rotation_rate = st.number_input(
+                "6. 回転率（250玉あたりの回転数）",
+                min_value=0.1,
+                value=float(st.session_state.get("pachinko_rotation_rate", 18.0)),
+                step=0.1,
+                key="pachinko_rotation_rate",
+            )
+
+            spins_per_hour = st.number_input(
+                "7. 1時間あたりの回転数（エヴァ15の場合200回転）",
+                min_value=0.1,
+                value=float(st.session_state.get("pachinko_spins_per_hour", 200.0)),
+                step=1.0,
+                key="pachinko_spins_per_hour",
+            )
+            st.caption(
+                f"1回転あたり：約 {3600 / float(spins_per_hour):.2f} 秒"
+            )
+
+            operation_hours = st.number_input(
+                "8. 稼働時間（時間）",
+                min_value=0.01,
+                value=float(st.session_state.get("pachinko_operation_hours", 8.0)),
+                step=0.5,
+                key="pachinko_operation_hours",
+            )
+
+        distribution_total = sum(item["rate"] for item in distribution)
+
+        if abs(distribution_total - 100.0) > 0.000001:
+            st.warning(
+                f"ラッシュ出玉振り分けの合計は現在 {_pachinko_number(distribution_total, 1)}% です。"
+                "結果を実行するには100%にしてください。"
+            )
+
+        if st.button(
+            "結果を見る 🎰",
+            use_container_width=True,
+            key="run_if_pachinko",
+        ):
+            if abs(distribution_total - 100.0) > 0.000001:
+                st.error("ラッシュの出玉振り分けの確率合計を100%にしてください。")
+            elif (
+                jackpot_probability <= 0
+                or rotation_rate <= 0
+                or spins_per_hour <= 0
+                or operation_hours <= 0
+            ):
+                st.error(
+                    "大当たり確率・回転率・1時間あたりの回転数・稼働時間は0より大きい値を入力してください。"
+                )
+            else:
+                # ------------------------------------------
+                # シミュレーション開始
+                # ------------------------------------------
+                remaining_time = float(operation_hours) * 3600.0
+                balance = 0.0
+                total_spins = 0
+                history = []
+
+                # 1時間あたりの回転数から、1回転あたりの時間を計算
+                seconds_per_spin = 3600.0 / float(spins_per_hour)
+
+                # 250玉あたりの回転率から、1回転あたりの消費玉数を計算
+                balls_per_spin = 250.0 / float(rotation_rate)
+
+
+                while remaining_time >= seconds_per_spin:
+                    spins_since_last_hit = 0
+                    hit = False
+
+                    # ===== 通常時：時間が足りる間だけ回転 =====
+                    while remaining_time >= seconds_per_spin:
+                        remaining_time -= seconds_per_spin
+                        balance -= balls_per_spin
+                        total_spins += 1
+                        spins_since_last_hit += 1
+
+                        # 大当たり抽選
+                        if random.random() < (1.0 / float(jackpot_probability)):
+                            hit = True
+                            break
+
+                    # 当たらず時間切れ
+                    if not hit:
+                        # 最後に当たらず終了した回転数も履歴に残す
+                        if spins_since_last_hit > 0:
+                            history.append({
+                                "回転数": spins_since_last_hit,
+                                "出玉": 0,
+                                "振り分け履歴": "時間切れ",
+                                "RUSH突入": "－",
+                                "収支": balance,
+                            })
+                        break
+
+                    # ここから大当たり後の処理
+                    hit_payout = 0
+                    distribution_counts = {}
+                    entered_rush = random.random() < (float(rush_entry_rate) / 100.0)
+
+                    if entered_rush:
+                        # 初当たり時の出球
+                        hit_payout += int(initial_payout)
+                        balance += int(initial_payout)
+
+                        # RUSH中は、時間が0以下になってもRUSH終了まで継続
+                        while random.random() < (float(rush_continue_rate) / 100.0):
+                            # 振り分け抽選
+                            roll = random.random() * 100.0
+                            cumulative = 0.0
+                            selected = distribution[-1]
+
+                            for item in distribution:
+                                cumulative += item["rate"]
+                                if roll < cumulative:
+                                    selected = item
+                                    break
+
+                            selected_payout = int(selected["payout"])
+                            hit_payout += selected_payout
+                            balance += selected_payout
+                            distribution_counts[selected_payout] = (
+                                distribution_counts.get(selected_payout, 0) + 1
+                            )
+
+                            # RUSH1回継続ごとに500秒消費
+                            remaining_time -= 500.0
+
+                        if distribution_counts:
+                            rush_distribution_text = "、".join(
+                                f"RUSH {_pachinko_number(payout)}玉 × {count}回"
+                                for payout, count in sorted(distribution_counts.items())
+                            )
+                            distribution_text = (
+                                f"初当たり {_pachinko_number(initial_payout)}玉、"
+                                f"{rush_distribution_text}"
+                            )
+                        else:
+                            distribution_text = (
+                                f"初当たり {_pachinko_number(initial_payout)}玉、"
+                                "RUSH継続なし"
+                            )
+                    else:
+                        distribution_text = "RUSHなし"
+
+                    # 当たり終了時点、またはRUSH終了時点の累計収支を保存
+                    history.append({
+                        "回転数": spins_since_last_hit,
+                        "出玉": hit_payout,
+                        "振り分け履歴": distribution_text,
+                        "RUSH突入": "突入" if entered_rush else "非突入",
+                        "収支": balance,
+                    })
+
+                    # RUSH終了時点で時間が0以下なら即終了
+                    if remaining_time <= 0:
+                        break
+
+                    # 通常時へ戻る
+                    continue
+
+                # 結果をsession_stateに保存
+                st.session_state["pachinko_result"] = {
+                    "balance": balance,
+                    "total_spins": total_spins,
+                    "remaining_time": remaining_time,
+                    "history": history,
+                    "balls_per_spin": balls_per_spin,
+                    "operation_seconds": float(operation_hours) * 3600.0,
+                    "seconds_per_spin": seconds_per_spin,
+                    "spins_per_hour": float(spins_per_hour),
+                }
+                st.rerun()
+
+        # ==========================================
+        # 結果表示
+        # ==========================================
+        pachinko_result = st.session_state.get("pachinko_result")
+
+        if pachinko_result is not None:
+            balance = pachinko_result["balance"]
+            history = pachinko_result["history"]
+            sign = "+" if balance >= 0 else "－"
+
+            st.markdown("---")
+            st.markdown("### シミュレーション結果")
+
+            st.html(
+                f"""
+                <div style="
+                    margin:12px 0 18px;
+                    padding:26px 18px;
+                    border-radius:16px;
+                    border:1px solid rgba(255,255,255,.18);
+                    background:rgba(255,255,255,.04);
+                    text-align:center;
+                ">
+                    <div style="
+                        color:#9fa8bf;
+                        font-size:14px;
+                        letter-spacing:1px;
+                        margin-bottom:8px;
+                    ">最終収支</div>
+                    <div style="
+                        color:#ffffff;
+                        font-size:48px;
+                        font-weight:900;
+                        line-height:1.1;
+                    ">{sign}{_pachinko_number(abs(balance))} 玉</div>
+                    <div style="
+                        color:#9fa8bf;
+                        font-size:13px;
+                        margin-top:12px;
+                    ">総回転数：{_pachinko_number(pachinko_result["total_spins"])} 回転</div>
+                </div>
+                """
+            )
+
+            st.subheader("📜 履歴")
+
+            if history:
+                history_df = pd.DataFrame(history)
+
+                # 履歴の収支を「＋ / － ○○玉」で表示
+                def _format_history_balance(value):
+                    value = float(value)
+                    sign = "+" if value >= 0 else "－"
+                    return f"{sign}{_pachinko_number(abs(value))}玉"
+
+                history_df["収支"] = history_df["収支"].apply(
+                    _format_history_balance
+                )
+
+                history_df.index = range(1, len(history_df) + 1)
+                history_df.index.name = "No."
+                st.dataframe(
+                    history_df,
+                    use_container_width=True,
+                )
+            else:
+                st.info("大当たり履歴はありません。")
+
+            if st.button(
+                "結果をリセット",
+                use_container_width=True,
+                key="reset_if_pachinko_result",
+            ):
+                st.session_state["pachinko_result"] = None
+                st.rerun()
+
+
+# 最初はメニュー画面を表示
+if st.session_state["app_page"] == "menu":
+    show_top_menu()
     st.stop()
 
+# 店舗分析を選択した場合だけ、従来の店舗選択を表示
+if st.session_state["app_page"] == "store_select":
+    show_store_select()
+    st.stop()
+
+# ミニゲームを選択
+if st.session_state["app_page"] == "minigame":
+    show_minigame()
+    st.stop()
 
 # ==========================================
 # 7. 分析メイン画面
 # ==========================================
 
 store = st.session_state["selected_store"]
+
+top_col1, top_col2 = st.columns([1, 5])
+with top_col1:
+    if st.button("メニュー", key="back_to_main_menu_from_analysis"):
+        st.session_state["app_page"] = "menu"
+        st.session_state["selected_store"] = None
+        st.rerun()
 
 st.markdown(
     """
