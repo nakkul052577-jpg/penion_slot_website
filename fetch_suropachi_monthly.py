@@ -14,7 +14,7 @@ import requests
 # 基本設定
 # ==========================================
 
-DB_PATH = "p_ark_database.db"
+DB_PATH = "database.db"
 SHOP_ID = "22404"
 
 BASE_POSTS_URL = (
