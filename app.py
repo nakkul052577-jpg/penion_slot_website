@@ -1908,16 +1908,20 @@ def show_minigame():
         st.markdown(
             """
             <style>
+            /* ==========================================
+               抽選人数入力欄
+               スマホでも「ゲームを選択」と同じ背景に統一
+               Streamlit / BaseWeb のDOM差異にも対応
+               ========================================== */
             div[data-testid="stNumberInput"] {
                 width: 100% !important;
-            }
-            div[data-testid="stNumberInput"] > div {
-                width: 100% !important;
                 background: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
             }
-            div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+
+            div[data-testid="stNumberInput"] > div,
+            div[data-testid="stNumberInput"] [data-baseweb="base-input"],
+            div[data-testid="stNumberInput"] [data-baseweb="input"],
+            div[data-testid="stNumberInput"] [data-baseweb="input"] > div {
                 width: 100% !important;
                 min-height: 50px !important;
                 background: #171d2d !important;
@@ -1928,22 +1932,38 @@ def show_minigame():
                 outline: none !important;
                 box-sizing: border-box !important;
             }
-            div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {
-                background: #171d2d !important;
-                background-color: #171d2d !important;
-                border: none !important;
+
+            /* 内側の不要な二重枠だけ消す */
+            div[data-testid="stNumberInput"] [data-baseweb="input"] > div,
+            div[data-testid="stNumberInput"] [data-baseweb="base-input"] > div {
+                border-color: transparent !important;
                 box-shadow: none !important;
             }
-            div[data-testid="stNumberInput"] input {
+
+            /* iPhone / Androidを含め、実際のinputにも背景色を強制 */
+            div[data-testid="stNumberInput"] input,
+            div[data-testid="stNumberInput"] input[type="number"] {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
-                background: transparent !important;
+                background: #171d2d !important;
+                background-color: #171d2d !important;
                 font-size: 18px !important;
                 font-weight: 700 !important;
                 border: none !important;
                 outline: none !important;
                 box-shadow: none !important;
+                appearance: textfield !important;
+                -webkit-appearance: none !important;
+                opacity: 1 !important;
             }
+
+            div[data-testid="stNumberInput"] input::-webkit-inner-spin-button,
+            div[data-testid="stNumberInput"] input::-webkit-outer-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+            }
+
+            /* ＋／－ボタンを完全非表示 */
             div[data-testid="stNumberInput"] button {
                 display: none !important;
                 visibility: hidden !important;
@@ -1954,8 +1974,14 @@ def show_minigame():
                 margin: 0 !important;
                 border: none !important;
             }
-            div[data-testid="stNumberInput"] div[data-baseweb="input"]:hover,
-            div[data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within {
+
+            /* タップ時・フォーカス時も白くならないよう固定 */
+            div[data-testid="stNumberInput"] [data-baseweb="base-input"]:hover,
+            div[data-testid="stNumberInput"] [data-baseweb="base-input"]:focus-within,
+            div[data-testid="stNumberInput"] [data-baseweb="input"]:hover,
+            div[data-testid="stNumberInput"] [data-baseweb="input"]:focus-within,
+            div[data-testid="stNumberInput"] input:hover,
+            div[data-testid="stNumberInput"] input:focus {
                 background: #171d2d !important;
                 background-color: #171d2d !important;
                 border-color: #454b5a !important;
@@ -2031,7 +2057,7 @@ def show_minigame():
         )
 
         if st.button(
-            "抽選する 🎰",
+            "抽選する",
             use_container_width=True,
             key="run_lottery",
         ):
@@ -2685,7 +2711,7 @@ def show_minigame():
                 """
             )
 
-            st.subheader("📜 履歴")
+            st.subheader("履歴")
 
             if history:
                 history_df = pd.DataFrame(history)
