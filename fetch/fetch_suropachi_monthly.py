@@ -14,7 +14,7 @@ import requests
 # 基本設定
 # ==========================================
 
-DB_PATH = "database.db"
+DB_PATH = "/Users/karishukunaoki/available2025.08/desk_manager/penion-game/slot_bunseki/database.db"
 SHOP_ID = "22404"
 
 BASE_POSTS_URL = (
