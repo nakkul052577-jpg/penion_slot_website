@@ -1,6 +1,7 @@
 import streamlit as st
 from games.lottery import show_lottery
 from games.if_pachinko import show_if_pachinko
+from games.buzzer import show_buzzer
 
 def show_minigame():
     st.markdown(
@@ -21,7 +22,7 @@ def show_minigame():
 
     game_name = st.selectbox(
         "ゲームを選択",
-        ["抽選", "IFのパチンコ"],
+        ["抽選", "IFのパチンコ", "早押し"],
         key="selected_minigame",
     )
 
@@ -31,3 +32,5 @@ def show_minigame():
         show_lottery()
     elif game_name == "IFのパチンコ":
         show_if_pachinko()
+    elif game_name == "早押し":
+        show_buzzer()
